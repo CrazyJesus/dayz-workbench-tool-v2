@@ -267,6 +267,7 @@
     <string name="convert_to_edds">Convert to EDDS</string>
     <string name="convert_to_png">Convert to PNG</string>
     <string name="copy">Copy</string>
+    <string name="copy_file_name">Copy file name</string>
     <string name="copy_properties">Copy properties</string>
     <string name="italic">Italic</string>
     <string name="latin">Latin</string>

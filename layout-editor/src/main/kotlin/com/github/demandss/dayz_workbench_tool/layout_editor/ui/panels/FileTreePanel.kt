@@ -51,6 +51,8 @@ import com.github.demandss.dayz_workbench_tool.ui.icons.fileIcon
 import com.github.demandss.dayz_workbench_tool.ui.theme.*
 import kotlinx.coroutines.*
 import org.jetbrains.compose.resources.stringResource
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.nio.file.*
 import java.nio.file.StandardWatchEventKinds.*
 import kotlin.math.roundToInt
@@ -461,6 +463,22 @@ fun FileTreePanel(
                                         ContextMenuItem(str(Res.string.open), icon = fileIcon(entry.name)) {
                                             showMenu = false
                                             state.openAny(entry.path.toString())
+                                        }
+                                        ContextMenuSeparator()
+                                    }
+                                    if (!entry.isDir) {
+                                        ContextMenuItem(str(Res.string.copy_file_name), icon = AppIcon.UI_COPY) {
+                                            showMenu = false
+                                            runCatching {
+                                                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(entry.name), null)
+                                            }.onSuccess {
+                                                state.notify(str(Res.string.copied_x, entry.name), ToastKind.SUCCESS)
+                                            }.onFailure {
+                                                state.notify(
+                                                    str(Res.string.could_not_copy_x, it.message ?: it.javaClass.simpleName),
+                                                    ToastKind.ERROR,
+                                                )
+                                            }
                                         }
                                         ContextMenuSeparator()
                                     }

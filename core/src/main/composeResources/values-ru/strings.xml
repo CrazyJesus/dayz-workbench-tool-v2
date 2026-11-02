@@ -267,6 +267,7 @@
     <string name="convert_to_edds">Конвертировать в EDDS</string>
     <string name="convert_to_png">Конвертировать в PNG</string>
     <string name="copy">Копировать</string>
+    <string name="copy_file_name">Скопировать имя файла</string>
     <string name="copy_properties">Копировать свойства</string>
     <string name="italic">Курсив</string>
     <string name="latin">Латиница</string>
