@@ -14,6 +14,7 @@ The tools read and write only inside the work drive and the folders of the conne
 - save_layout writes the file. Do not leave a layout modified and unsaved when the task is done.
 
 ## The .layout format
+- A widget name is the `Name "WidgetName"` property. The root has no resource ID; child headers are `WidgetClass "{00000000A1B2C3D4}" {`. Old headers with the name after the class are accepted, and save_layout writes the new form. Existing child IDs survive edits; copies get new IDs.
 - Property values are written as they stand in the file: text and paths in quotes ("set:Icons image:Cross"), numbers and flags without.
 - A property name with a space (text color, exact text size) is given without quotes: the file writer quotes it. A name the editor does not know is written all the same, with a warning in the answer.
 - "exact text size" must be a whole number. Workbench 1.30 stops reading the layout after a widget with a fractional size and shows nothing of what follows, while this preview still draws it.

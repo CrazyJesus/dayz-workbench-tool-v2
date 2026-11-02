@@ -28,6 +28,7 @@ class ClipboardFormatTest {
         assertNotNull(back)
         assertEquals(listOf("a", "b"), back.map { it.node.name })
         assertNotEquals(a.id, back[0].id)
+        assertNotEquals(a.node.resourceId, back[0].node.resourceId)
         assertEquals("10 10", back[0].node.properties["size"])
     }
 

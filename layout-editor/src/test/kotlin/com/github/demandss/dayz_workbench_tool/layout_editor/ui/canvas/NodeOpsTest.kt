@@ -84,6 +84,8 @@ class NodeOpsTest {
         assertEquals(listOf("a", "a_copy", "b"), newRoot.children.map { it.node.name })
         val copy = newRoot.findNode(copyId)!!
         assertNotEquals(a.children[0].id, copy.children[0].id)
+        assertNotEquals(a.node.resourceId, copy.node.resourceId)
+        assertNotEquals(a.children[0].node.resourceId, copy.children[0].node.resourceId)
         assertNotNull(copy.children.firstOrNull())
     }
 

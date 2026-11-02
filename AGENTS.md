@@ -50,11 +50,15 @@ JDK 25 (toolchain). The version of the programs is `version = "..."` in the root
 Text format, not XML or JSON:
 
 ```
-WidgetClassName WidgetName {
+WidgetClassName {
+  Name "WidgetName"
   property value
   "quoted property name" value
   {
-    ChildWidgetClass ChildName { ... }
+    ChildWidgetClass "{00000000A1B2C3D4}" {
+      Name "ChildName"
+      ...
+    }
   }
 }
 ```
@@ -62,6 +66,7 @@ WidgetClassName WidgetName {
 - `hexactpos` / `vexactpos` / `hexactsize` / `vexactsize` choose whether position and size are pixels (`1`) or fractions 0..1 (`0`).
 - Colors are `color R G B A` floats; `halign` / `valign`: `left`, `center_ref`, `right`, `right_ref`, `top`, `bottom`, `bottom_ref`.
 - Children are in the second `{ }` block. `EmbededWidgetClass` points to another layout with `layout "path"`.
+- The root has no resource ID. Children have a quoted 16-digit hex ID in braces after their class name; their script-facing name is the `Name` property. The parser also accepts the old `WidgetClassName WidgetName {` form, and saving writes the new form.
 
 ## MCP server (layout editor)
 
