@@ -222,6 +222,26 @@ private fun fontOptions(
 // Commit helpers
 // ---------------------------------------------------------------------------
 
+/** The Transform fields show percentages on a 0–100 scale while layouts store shares on a 0–1 scale. */
+internal fun displayTransformValue(
+    raw: String,
+    isPx: Boolean,
+): String = if (isPx) raw else raw.toFloatOrNull()?.let { formatNumber(it * 100f) } ?: raw
+
+/** Change one axis without converting the other axis, which may use different units. */
+internal fun storedTransformPair(
+    raw: String?,
+    axis: Int,
+    fieldValue: String,
+    isPx: Boolean,
+): String? {
+    val value = fieldValue.trim().toFloatOrNull()?.takeIf { it.isFinite() } ?: return null
+    val parts = (raw ?: "0 0").trim().split(Regex("\\s+")).toMutableList()
+    while (parts.size < 2) parts.add("0")
+    parts[axis] = formatNumber(if (isPx) value else value / 100f)
+    return "${parts[0]} ${parts[1]}"
+}
+
 private fun commitName(
     state: LayoutEditorState,
     id: UUID,
@@ -411,30 +431,26 @@ private fun PropertiesHeader(
 
     val posParts = (props["position"] ?: "0 0").trim().split(Regex("\\s+"))
     val szParts = (props["size"] ?: "0 0").trim().split(Regex("\\s+"))
-    var px by remember(props["position"]) { mutableStateOf(posParts.getOrNull(0) ?: "0") }
-    var py by remember(props["position"]) { mutableStateOf(posParts.getOrNull(1) ?: "0") }
-    var sw by remember(props["size"]) { mutableStateOf(szParts.getOrNull(0) ?: "0") }
-    var sh by remember(props["size"]) { mutableStateOf(szParts.getOrNull(1) ?: "0") }
+    val px = displayTransformValue(posParts.getOrNull(0) ?: "0", hexactpos)
+    val py = displayTransformValue(posParts.getOrNull(1) ?: "0", vexactpos)
+    val sw = displayTransformValue(szParts.getOrNull(0) ?: "0", hexactsize)
+    val sh = displayTransformValue(szParts.getOrNull(1) ?: "0", vexactsize)
 
     Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             NumberField("X", px, hexactpos, Modifier.weight(1f), { switchUnit(state, id, props, "position", 0, "hexactpos", it) }) { v ->
-                px = v
-                commit("position", "$v $py")
+                storedTransformPair(props["position"], 0, v, hexactpos)?.let { commit("position", it) }
             }
             NumberField("Y", py, vexactpos, Modifier.weight(1f), { switchUnit(state, id, props, "position", 1, "vexactpos", it) }) { v ->
-                py = v
-                commit("position", "$px $v")
+                storedTransformPair(props["position"], 1, v, vexactpos)?.let { commit("position", it) }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             NumberField("W", sw, hexactsize, Modifier.weight(1f), { switchUnit(state, id, props, "size", 0, "hexactsize", it) }) { v ->
-                sw = v
-                commit("size", "$v $sh")
+                storedTransformPair(props["size"], 0, v, hexactsize)?.let { commit("size", it) }
             }
             NumberField("H", sh, vexactsize, Modifier.weight(1f), { switchUnit(state, id, props, "size", 1, "vexactsize", it) }) { v ->
-                sh = v
-                commit("size", "$sw $v")
+                storedTransformPair(props["size"], 1, v, vexactsize)?.let { commit("size", it) }
             }
         }
 
@@ -1169,12 +1185,13 @@ private fun NumberField(
 ) {
     var text by remember(value) { mutableStateOf(value) }
     var focused by remember { mutableStateOf(false) }
+    val latestCommit = rememberUpdatedState(onCommit)
 
     fun step(delta: Float) {
         val v = text.toFloatOrNull() ?: 0f
         val result = formatShort(v + delta)
         text = result
-        onCommit(result)
+        latestCommit.value(result)
     }
 
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -1206,7 +1223,7 @@ private fun NumberField(
             modifier =
                 Modifier
                     .weight(1f)
-                    .pointerInput(Unit) {
+                    .pointerInput(value, isPx) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Main)
@@ -1223,12 +1240,12 @@ private fun NumberField(
                             }
                         }
                     }.onFocusChanged { fs ->
-                        if (focused && !fs.isFocused && text != value) onCommit(text)
+                        if (focused && !fs.isFocused && text != value) latestCommit.value(text)
                         focused = fs.isFocused
                     }.onKeyEvent { ev ->
                         when {
                             ev.key == Key.Enter && ev.type == KeyEventType.KeyDown -> {
-                                if (text != value) onCommit(text)
+                                if (text != value) latestCommit.value(text)
                                 true
                             }
 
