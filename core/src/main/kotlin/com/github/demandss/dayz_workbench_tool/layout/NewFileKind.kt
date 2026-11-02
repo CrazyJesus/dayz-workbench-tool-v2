@@ -20,7 +20,7 @@ enum class NewFileKind(
     fun template(fileName: String): String {
         val name = fileName.removeSuffix(extension)
         return when (this) {
-            LAYOUT -> "FrameWidgetClass RootFrame {\n}\n"
+            LAYOUT -> "FrameWidgetClass {\n Name \"RootFrame\"\n}\n"
             STYLES -> "<WidgetStyles>\n</WidgetStyles>\n"
             IMAGESET -> "ImageSetClass {\n Name \"$name\"\n RefSize 1024 1024\n Textures {\n }\n Images {\n }\n}\n"
             FOLDER -> ""

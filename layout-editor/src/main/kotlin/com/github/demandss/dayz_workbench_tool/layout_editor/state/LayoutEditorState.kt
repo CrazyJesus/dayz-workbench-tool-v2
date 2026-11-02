@@ -126,6 +126,8 @@ private const val HIGHLIGHT_LIFT = 0.27f
 
 enum class PaletteMode { COMMANDS, FILES, WIDGETS }
 
+enum class TabCloseAction { CURRENT, RIGHT, LEFT, OTHERS, ALL }
+
 /** The menu of the widgets under the cursor, opened by the right button on the canvas at [position] (canvas pixels). */
 class CanvasMenu(
     val position: Offset,
@@ -182,12 +184,19 @@ class LayoutEditorState(
     var gamePbo by mutableStateOf<PboArchive?>(null)
         private set
 
-    /** The top level folders of the file tree: the game's data and the connected mods. Null: the work drive itself. */
+    /** The top level folders of the file tree: the game's source files and the connected mods. Null: the work drive itself. */
     val treeRoots: List<TreeRoot>?
         get() {
             val mods = modFolders ?: return null
             return buildList {
-                gamePbo?.let { add(TreeRoot(it.file.path, "DayZ", it)) }
+                val gameSource =
+                    File(workDrivePath, "gui")
+                        .takeIf { workDrivePath.isNotBlank() && File(it, "looknfeel/dayzwidgets.styles").isFile }
+                if (gameSource != null) {
+                    add(TreeRoot(gameSource.path, "DayZ"))
+                } else {
+                    gamePbo?.let { add(TreeRoot(it.file.path, "DayZ", it)) }
+                }
                 mods.filter { File(it).isDirectory }.forEach { add(TreeRoot(it, File(it).name.ifEmpty { it })) }
             }
         }
@@ -832,6 +841,74 @@ class LayoutEditorState(
     private fun allTabs() =
         openFiles.indices.map { 0 to it } + openTextures.indices.map { 1 to it } + openImageSets.indices.map { 2 to it } +
             openStyles.indices.map { 3 to it }
+
+    fun closeTabs(
+        kind: Int,
+        index: Int,
+        action: TabCloseAction,
+    ) {
+        val tabs = allTabs()
+        val clicked = tabs.indexOf(kind to index)
+        if (clicked < 0) return
+        val targets =
+            tabs.filterIndexed { position, _ ->
+                when (action) {
+                    TabCloseAction.CURRENT -> position == clicked
+                    TabCloseAction.RIGHT -> position > clicked
+                    TabCloseAction.LEFT -> position < clicked
+                    TabCloseAction.OTHERS -> position != clicked
+                    TabCloseAction.ALL -> true
+                }
+            }
+        if (targets.isEmpty()) return
+
+        val modified =
+            targets.any { (tabKind, tabIndex) ->
+                when (tabKind) {
+                    0 -> openFiles[tabIndex].isModified
+                    2 -> openImageSets[tabIndex].isModified
+                    3 -> openStyles[tabIndex].isModified
+                    else -> false
+                }
+            }
+        val closeSelected = {
+            // Reverse order keeps the indices of the remaining tabs stable within each type.
+            targets.asReversed().forEach { (tabKind, tabIndex) ->
+                when (tabKind) {
+                    0 -> closeFile(tabIndex)
+                    1 -> closeTexture(tabIndex)
+                    2 -> dropImageSet(tabIndex)
+                    3 -> dropStyles(tabIndex)
+                }
+            }
+            if (action == TabCloseAction.OTHERS) selectTab(kind, 0)
+        }
+        if (modified) {
+            val title =
+                if (targets.size == 1) {
+                    val (tabKind, tabIndex) = targets.single()
+                    val name =
+                        when (tabKind) {
+                            0 -> openFiles[tabIndex].fileName
+                            1 -> openTextures[tabIndex].fileName
+                            2 -> openImageSets[tabIndex].fileName
+                            else -> openStyles[tabIndex].fileName
+                        }
+                    str(Res.string.close_x, name)
+                } else {
+                    str(Res.string.close_tabs_x, targets.size)
+                }
+            confirmation =
+                Confirmation(
+                    title = title,
+                    message = str(Res.string.there_are_unsaved_changes_they_will_be),
+                    confirmLabel = str(Res.string.close),
+                    danger = true,
+                ) { closeSelected() }
+        } else {
+            closeSelected()
+        }
+    }
 
     private fun selectTab(
         kind: Int,

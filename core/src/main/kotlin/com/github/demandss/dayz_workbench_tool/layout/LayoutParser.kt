@@ -8,13 +8,20 @@ private class ParserState(
     private val input: String,
 ) {
     var pos = 0
+    private val resourceIdPattern = Regex("\\{([0-9A-Fa-f]{16})}")
 
     fun parseWidget(): WidgetNode {
         skipWhitespaceAndComments()
         val className = readBareWord()
         skipInlineWhitespace()
 
-        val name = if (pos < input.length && input[pos] != '{') readBareWord() else ""
+        val header =
+            when {
+                pos >= input.length || input[pos] == '{' -> ""
+                input[pos] == '"' -> readQuotedString()
+                else -> readBareWord()
+            }
+        val resourceId = resourceIdPattern.matchEntire(header)?.groupValues?.get(1)
         skipInlineWhitespace()
         expectChar('{')
 
@@ -47,7 +54,17 @@ private class ParserState(
             }
         }
 
-        return WidgetNode(WidgetType.fromClassName(className), className, name, props, children, scriptParams)
+        val name = props.remove("Name") ?: if (resourceId == null) header else ""
+        return WidgetNode(
+            WidgetType.fromClassName(className),
+            className,
+            name,
+            props,
+            children,
+            scriptParams,
+            resourceId ?: newWidgetResourceId(),
+            resourceId != null,
+        )
     }
 
     /** Reads `ScriptParamsClass { key value ... }` and the brace that closes the block around it. */
@@ -85,7 +102,12 @@ private class ParserState(
     private fun parsePropInto(props: LinkedHashMap<String, String>) {
         val key = if (input[pos] == '"') readQuotedString() else readBareWord()
         skipInlineWhitespace()
-        val value = readToEndOfLine()
+        val value =
+            if (key == "Name" && pos < input.length && input[pos] == '"') {
+                readQuotedString()
+            } else {
+                readToEndOfLine()
+            }
         if (key.isNotEmpty()) props[key] = value
     }
 

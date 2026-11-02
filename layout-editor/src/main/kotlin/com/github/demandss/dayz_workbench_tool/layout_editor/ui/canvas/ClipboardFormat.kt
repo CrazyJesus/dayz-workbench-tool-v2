@@ -29,7 +29,7 @@ internal fun parseClipboard(text: String): List<EditorWidgetNode>? {
     val parsed = runCatching { LayoutParser.parse(text) }.getOrNull() ?: return null
     if (parsed.type == WidgetType.UNKNOWN) return null
     val nodes = if (parsed.name == CLIPBOARD_FRAME) parsed.children else listOf(parsed)
-    return nodes.map { it.toEditorNode() }
+    return nodes.map { it.toEditorNode().copiedWithNewIds() }
 }
 
 /**
