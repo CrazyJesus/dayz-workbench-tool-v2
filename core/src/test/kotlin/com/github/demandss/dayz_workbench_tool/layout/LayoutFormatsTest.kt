@@ -76,6 +76,30 @@ class LayoutFormatsTest {
     }
 
     @Test
+    fun `comments after Name do not become part of widget names`() {
+        val source =
+            """
+            FrameWidgetClass {
+             Name "Main // Screen" // root comment
+             {
+              PanelWidgetClass "{000000001234ABCD}" {
+               Name "Child" /* child comment */
+              }
+             }
+            }
+            """.trimIndent()
+
+        val root = LayoutParser.parse(source)
+        val saved = LayoutSerializer.serialize(root)
+
+        assertEquals("Main // Screen", root.name)
+        assertEquals("Child", root.children.single().name)
+        assertFalse(saved.contains("root comment"))
+        assertFalse(saved.contains("child comment"))
+        assertEquals("Main // Screen", LayoutParser.parse(saved).name)
+    }
+
+    @Test
     fun `legacy children get distinct resource ids`() {
         val root = LayoutParser.parse("FrameWidgetClass Root {\n {\n PanelWidgetClass A {}\n PanelWidgetClass B {}\n }\n}")
 

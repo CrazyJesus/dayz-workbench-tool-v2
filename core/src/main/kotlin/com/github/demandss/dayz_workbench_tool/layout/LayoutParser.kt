@@ -54,7 +54,7 @@ private class ParserState(
             }
         }
 
-        val name = props.remove("Name")?.trim()?.removeSurrounding("\"") ?: if (resourceId == null) header else ""
+        val name = props.remove("Name") ?: if (resourceId == null) header else ""
         return WidgetNode(
             WidgetType.fromClassName(className),
             className,
@@ -102,7 +102,14 @@ private class ParserState(
     private fun parsePropInto(props: LinkedHashMap<String, String>) {
         val key = if (input[pos] == '"') readQuotedString() else readBareWord()
         skipInlineWhitespace()
-        val value = readToEndOfLine()
+        val value =
+            if (key == "Name" && pos < input.length && input[pos] == '"') {
+                val quotedName = readQuotedString()
+                readToEndOfLine()
+                quotedName
+            } else {
+                readToEndOfLine()
+            }
         if (key.isNotEmpty()) props[key] = value
     }
 
