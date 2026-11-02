@@ -1155,6 +1155,21 @@ class LayoutEditorState(
         focusNameTick++
     }
 
+    fun renameWidget(
+        id: UUID,
+        name: String,
+    ) {
+        val idx = activeFileIndex
+        val doc = openFiles.getOrNull(idx) ?: return
+        val node = doc.root.findNode(id) ?: return
+        // Scripts find widgets by name, so keep Latin letters, digits and underscores.
+        val clean = sanitizeWidgetName(name)
+        if (clean == node.node.name) return
+        if (clean != name.trim()) notify(str(Res.string.the_widget_name_is_written_in_latin, clean), ToastKind.INFO)
+        pushUndo(idx, doc.root, str(Res.string.renaming_to_x, clean))
+        updateActiveRoot(doc.root.updateNode(id) { it.copy(node = it.node.copy(name = clean)) })
+    }
+
     private var lastNudgeAt = 0L
 
     /** Moves the selection by [dx], [dy] layout pixels. Keys pressed in a row become one step of the history. */

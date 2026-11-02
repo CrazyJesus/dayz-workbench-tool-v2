@@ -57,7 +57,6 @@ import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.layoutTre
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.mergedProperties
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.moveSelectionTo
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.parseWidgetColor
-import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.sanitizeWidgetName
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.scaleSelectionTo
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.screenRect
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.selectionRect
@@ -242,20 +241,6 @@ internal fun storedTransformPair(
     return "${parts[0]} ${parts[1]}"
 }
 
-private fun commitName(
-    state: LayoutEditorState,
-    id: UUID,
-    name: String,
-) {
-    val idx = state.activeFileIndex
-    val doc = state.openFiles.getOrNull(idx) ?: return
-    // Script finds a widget by its name, so the name is kept to Latin letters, digits and underscores
-    val clean = sanitizeWidgetName(name)
-    if (clean != name.trim()) state.notify(str(Res.string.the_widget_name_is_written_in_latin, clean))
-    state.pushUndo(idx, doc.root, str(Res.string.renaming_to_x, clean))
-    state.updateActiveRoot(doc.root.updateNode(id) { it.copy(node = it.node.copy(name = clean)) })
-}
-
 private fun commitType(
     state: LayoutEditorState,
     id: UUID,
@@ -416,7 +401,7 @@ private fun PropertiesHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AppIconView(widgetIcon(type), size = 18.dp)
-        StringField(name, Modifier.weight(1f), focusTick = state.focusNameTick) { commitName(state, id, it) }
+        StringField(name, Modifier.weight(1f), focusTick = state.focusNameTick) { state.renameWidget(id, it) }
         TypeDropdown(type) { commitType(state, id, it) }
     }
 
