@@ -1,5 +1,6 @@
 package com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,10 +22,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -816,6 +821,8 @@ internal fun ContextMenuItem(
     text: String,
     color: Color = TextForeground,
     icon: AppIcon? = null,
+    image: ImageBitmap? = null,
+    imageTint: Color? = null,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -831,7 +838,17 @@ internal fun ContextMenuItem(
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (icon != null) AppIconView(icon, size = 14.dp, tint = color.takeIf { it != TextForeground })
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = imageTint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
+                )
+            } else if (icon != null) {
+                AppIconView(icon, size = 14.dp, tint = color.takeIf { it != TextForeground })
+            }
             Text(text, color = color, fontSize = 11.sp, maxLines = 1)
         }
     }
