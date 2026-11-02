@@ -49,6 +49,19 @@ class LayerClickCycleTest {
     }
 
     @Test
+    fun `double clicks skip locked widgets and wrap among selectable layers`() {
+        val hits = hits()
+        val layout = layoutTree(hits.last(), Rect(0f, 0f, 100f, 100f))
+        val ordered = preferredLayerHits(hits, layout, setOf(hits.first().id)) { false }
+        val clicks = LayerClickCycle(doubleClickMillis = 500)
+
+        assertEquals(listOf("Back", "Root"), ordered.map { it.node.name })
+        assertEquals("Back", clicks.nextTarget(ordered, hits.first().id, "layout")?.node?.name)
+        assertEquals("Root", clicks.nextTarget(ordered, null, "layout")?.node?.name)
+        assertEquals("Back", clicks.nextTarget(ordered, null, "layout")?.node?.name)
+    }
+
+    @Test
     fun `a pair advances only when a layer was selected before its first click`() {
         val hits = hits()
         val clicks = LayerClickCycle(doubleClickMillis = 500)
@@ -115,7 +128,10 @@ class LayerClickCycleTest {
         hitsAt(root, Offset(15f, 15f), layout, emptySet(), hits)
 
         assertEquals(listOf("Background", "Icon", "Row", "Root"), hits.map { it.node.name })
-        val ordered = preferredLayerHits(hits, layout) { it.node.type == com.github.demandss.dayz_workbench_tool.layout.WidgetType.IMAGE }
+        val ordered =
+            preferredLayerHits(hits, layout, emptySet()) {
+                it.node.type == com.github.demandss.dayz_workbench_tool.layout.WidgetType.IMAGE
+            }
         assertEquals(listOf("Icon", "Row", "Background", "Root"), ordered.map { it.node.name })
 
         val clicks = LayerClickCycle(doubleClickMillis = 500)

@@ -9,9 +9,11 @@ import java.util.UUID
 internal fun preferredLayerHits(
     hits: List<EditorWidgetNode>,
     layout: TreeLayout,
+    lockedIds: Set<UUID>,
     hasPicture: (EditorWidgetNode) -> Boolean,
 ): List<EditorWidgetNode> {
-    if (hits.size < 2) return hits
+    val selectableHits = hits.filterNot { it.id in lockedIds }
+    if (selectableHits.size < 2) return selectableHits
 
     fun area(node: EditorWidgetNode): Float = layout.rects[node.id]?.let { it.width * it.height } ?: Float.POSITIVE_INFINITY
 
@@ -24,8 +26,8 @@ internal fun preferredLayerHits(
         }
     }
 
-    val preferred = hits.filter(::drawsContent).minByOrNull(::area) ?: hits.minBy(::area)
-    return listOf(preferred) + hits.filterNot { it.id == preferred.id }.sortedBy(::area)
+    val preferred = selectableHits.filter(::drawsContent).minByOrNull(::area) ?: selectableHits.minBy(::area)
+    return listOf(preferred) + selectableHits.filterNot { it.id == preferred.id }.sortedBy(::area)
 }
 
 /** The next widget in the ordered stack, wrapping back to the first one. */

@@ -862,7 +862,9 @@ fun LayoutCanvas(
                                     val cycleTarget =
                                         if (clickPair != null && pressDoc != null && pressLayout != null) {
                                             layerClicks.nextTarget(
-                                                preferredLayerHits(pressHits, pressLayout) { state.pictureFor(it, pressDoc.path) != null },
+                                                preferredLayerHits(pressHits, pressLayout, state.lockedIds.toSet()) {
+                                                    state.pictureFor(it, pressDoc.path) != null
+                                                },
                                                 clickPair.selectedAtStart,
                                                 pressDoc.path,
                                             )
