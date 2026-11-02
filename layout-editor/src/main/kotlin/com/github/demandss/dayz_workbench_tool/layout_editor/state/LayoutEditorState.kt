@@ -182,12 +182,19 @@ class LayoutEditorState(
     var gamePbo by mutableStateOf<PboArchive?>(null)
         private set
 
-    /** The top level folders of the file tree: the game's data and the connected mods. Null: the work drive itself. */
+    /** The top level folders of the file tree: the game's source files and the connected mods. Null: the work drive itself. */
     val treeRoots: List<TreeRoot>?
         get() {
             val mods = modFolders ?: return null
             return buildList {
-                gamePbo?.let { add(TreeRoot(it.file.path, "DayZ", it)) }
+                val gameSource =
+                    File(workDrivePath, "gui")
+                        .takeIf { workDrivePath.isNotBlank() && File(it, "looknfeel/dayzwidgets.styles").isFile }
+                if (gameSource != null) {
+                    add(TreeRoot(gameSource.path, "DayZ"))
+                } else {
+                    gamePbo?.let { add(TreeRoot(it.file.path, "DayZ", it)) }
+                }
                 mods.filter { File(it).isDirectory }.forEach { add(TreeRoot(it, File(it).name.ifEmpty { it })) }
             }
         }
