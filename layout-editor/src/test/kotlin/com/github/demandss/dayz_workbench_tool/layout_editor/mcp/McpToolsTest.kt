@@ -107,7 +107,9 @@ class McpToolsTest {
             },
         )
         ok("save_layout")
-        assertTrue("TextWidgetClass Title" in File(path).readText())
+        val saved = File(path).readText()
+        assertTrue("Name \"Title\"" in saved, saved)
+        assertTrue(Regex("""TextWidgetClass "\{[0-9A-F]{16}}" \{""").containsMatchIn(saved), saved)
     }
 
     @Test
@@ -249,7 +251,8 @@ class McpToolsTest {
     @Test
     fun `the whole text of a layout is read and replaced`() {
         newLayout()
-        assertTrue("FrameWidgetClass Root" in ok("get_layout_text"))
+        val current = ok("get_layout_text")
+        assertTrue("FrameWidgetClass {" in current && "Name \"Root\"" in current, current)
 
         val text = "FrameWidgetClass Root {\n size 100 100\n {\n  TextWidgetClass Hello {\n   text \"Hi\"\n  }\n }\n}\n"
         ok("replace_layout_text", args("text" to text))

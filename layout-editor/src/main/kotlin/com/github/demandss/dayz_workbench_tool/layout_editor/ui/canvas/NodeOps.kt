@@ -1,6 +1,7 @@
 package com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas
 
 import androidx.compose.ui.geometry.Rect
+import com.github.demandss.dayz_workbench_tool.layout.newWidgetResourceId
 import com.github.demandss.dayz_workbench_tool.layout_editor.EditorWidgetNode
 import com.github.demandss.dayz_workbench_tool.layout_editor.findNode
 import com.github.demandss.dayz_workbench_tool.layout_editor.updateNode
@@ -86,7 +87,11 @@ internal fun alignedRoot(
 
 /** A copy of the widget and everything under it, with new ids. */
 internal fun EditorWidgetNode.copiedWithNewIds(): EditorWidgetNode =
-    EditorWidgetNode(UUID.randomUUID(), node.copy(), children.map { it.copiedWithNewIds() }.toMutableList())
+    EditorWidgetNode(
+        UUID.randomUUID(),
+        node.copy(resourceId = newWidgetResourceId()),
+        children.map { it.copiedWithNewIds() }.toMutableList(),
+    )
 
 /** Puts a copy right after the widget [id] among its siblings. Returns the new root and the id of the copy, or null for the root. */
 internal fun EditorWidgetNode.withCopyOf(id: UUID): Pair<EditorWidgetNode, UUID>? {

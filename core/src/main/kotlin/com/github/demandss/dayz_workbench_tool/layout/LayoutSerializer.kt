@@ -14,9 +14,10 @@ object LayoutSerializer {
             val innerIndent = "\t".repeat(depth + 1)
 
             val className = if (node.type == WidgetType.UNKNOWN) node.originalClassName else node.type.className
-            val namePart = if (node.name.isNotEmpty()) " ${node.name}" else ""
+            val idPart = if (depth > 0 || node.hasResourceId) " \"{${node.resourceId}}\"" else ""
 
-            append("$indent$className$namePart {\n")
+            append("$indent$className$idPart {\n")
+            append("${innerIndent}Name \"${node.name}\"\n")
 
             for ((key, value) in node.properties) {
                 val quotedKey = if (' ' in key) "\"$key\"" else key
