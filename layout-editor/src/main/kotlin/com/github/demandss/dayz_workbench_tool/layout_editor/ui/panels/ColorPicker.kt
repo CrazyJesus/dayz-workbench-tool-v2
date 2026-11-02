@@ -37,12 +37,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -78,6 +80,15 @@ private val PRESETS =
         0xFF8E24AA,
     ).map { Color(it) }
 
+internal fun colorFromPickerText(
+    text: String,
+    currentAlpha: Float,
+): Color? {
+    val parsed = parseColorText(text) ?: return null
+    val digits = text.trim().removePrefix("#").length
+    return if (text.contains('(') || digits == 4 || digits == 8) parsed else parsed.copy(alpha = currentAlpha)
+}
+
 /**
  * A colour picker as a popup under [anchorHeightPx]. [initial] is the colour as it is shown on the screen. The result goes
  * to [onCommit] when a drag ends or a hex value is entered, so one change is one step of the undo history.
@@ -96,20 +107,31 @@ fun ColorPickerPopup(
     var value by remember { mutableStateOf(start.v) }
     var alpha by remember { mutableStateOf(initial.alpha) }
     val current = hsvToColor(hue, sat, value, alpha)
-    var hexText by remember { mutableStateOf(current.toHex()) }
+    var hexField by remember { mutableStateOf(TextFieldValue(current.toHex())) }
     val focus = remember { FocusRequester() }
+
+    fun showHex(text: String) {
+        hexField = TextFieldValue(text, selection = TextRange(text.length))
+    }
 
     fun set(c: Color) {
         val h = c.toHsv()
         hue = if (h.s == 0f || h.v == 0f) hue else h.h
         sat = h.s
         value = h.v
-        hexText = c.toHex()
+        showHex(c.toHex())
     }
 
     fun finish() {
-        hexText = hsvToColor(hue, sat, value, alpha).toHex()
+        showHex(hsvToColor(hue, sat, value, alpha).toHex())
         onCommit(hsvToColor(hue, sat, value, alpha))
+    }
+
+    fun applyText(text: String) {
+        val parsed = colorFromPickerText(text, alpha) ?: return
+        alpha = parsed.alpha
+        set(parsed)
+        finish()
     }
 
     Popup(
@@ -129,6 +151,7 @@ fun ColorPickerPopup(
             // The field is part of this popup, so it can take the focus only after the first frame
             LaunchedEffect(Unit) {
                 withFrameNanos { }
+                hexField = hexField.copy(selection = TextRange(0, hexField.text.length))
                 runCatching { focus.requestFocus() }
             }
             // Saturation and value
@@ -140,7 +163,7 @@ fun ColorPickerPopup(
                     .dragPick({ p, size ->
                         sat = (p.x / size.width).coerceIn(0f, 1f)
                         value = 1f - (p.y / size.height).coerceIn(0f, 1f)
-                        hexText = hsvToColor(hue, sat, value).toHex()
+                        showHex(hsvToColor(hue, sat, value, alpha).toHex())
                     }, ::finish),
             ) {
                 Canvas(Modifier.fillMaxSize()) {
@@ -162,7 +185,7 @@ fun ColorPickerPopup(
                 fraction = hue / 360f,
                 onPick = { f ->
                     hue = f * 360f
-                    hexText = hsvToColor(hue, sat, value).toHex()
+                    showHex(hsvToColor(hue, sat, value, alpha).toHex())
                 },
                 onDone = ::finish,
             )
@@ -185,25 +208,18 @@ fun ColorPickerPopup(
                         .border(1.dp, DarkenedBorder),
                 )
                 BasicTextField(
-                    value = hexText,
+                    value = hexField,
                     onValueChange = { typed ->
                         // Text that was pasted next to the old value is read on its own
                         val inserted =
                             when {
-                                typed.length - hexText.length <= 1 && !typed.contains('(') -> null
-                                typed.endsWith(hexText) -> typed.removeSuffix(hexText)
-                                typed.startsWith(hexText) -> typed.removePrefix(hexText)
-                                else -> typed
+                                typed.text.length - hexField.text.length <= 1 && !typed.text.contains('(') -> null
+                                typed.text.endsWith(hexField.text) -> typed.text.removeSuffix(hexField.text)
+                                typed.text.startsWith(hexField.text) -> typed.text.removePrefix(hexField.text)
+                                else -> typed.text
                             }
-                        val pasted = inserted?.let { parseColorText(it) }
-                        hexText = typed
-                        if (pasted != null) {
-                            val digits = inserted.trim().removePrefix("#").length
-                            // rgba(), hsla() and 4 or 8 digit hex carry their own alpha
-                            if (inserted.contains('(') || digits == 4 || digits == 8) alpha = pasted.alpha
-                            set(pasted)
-                            finish()
-                        }
+                        hexField = typed
+                        inserted?.let(::applyText)
                     },
                     singleLine = true,
                     textStyle = TextStyle(color = TextForeground, fontSize = 11.sp, fontFamily = FontFamily.Monospace),
@@ -223,12 +239,9 @@ fun ColorPickerPopup(
                         }
                     },
                     modifier =
-                        Modifier.weight(1f).focusRequester(focus).onKeyEvent { ev ->
-                            if (ev.key == Key.Enter && ev.type == KeyEventType.KeyDown) {
-                                parseColorText(hexText)?.let {
-                                    set(it)
-                                    finish()
-                                }
+                        Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { ev ->
+                            if ((ev.key == Key.Enter || ev.key == Key.NumPadEnter) && ev.type == KeyEventType.KeyDown) {
+                                applyText(hexField.text)
                                 true
                             } else {
                                 false

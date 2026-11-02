@@ -195,6 +195,11 @@
     <string name="loading">Загрузка…</string>
     <string name="no_tasks_added">Задачи не добавлены</string>
     <string name="close">Закрыть</string>
+    <string name="close_all_tabs">Закрыть все вкладки</string>
+    <string name="close_other_tabs">Закрыть остальные вкладки</string>
+    <string name="close_tabs_to_left">Закрыть вкладки слева</string>
+    <string name="close_tabs_to_right">Закрыть вкладки справа</string>
+    <string name="close_tabs_x">Закрыть вкладки (%1$s)?</string>
     <string name="close_x">Закрыть %1$s?</string>
     <string name="close_the_tab_ctrl_w">Закрыть вкладку (Ctrl+W)</string>
     <string name="replace_x_x">Замена %1$s (%2$s)</string>
@@ -262,6 +267,7 @@
     <string name="convert_to_edds">Конвертировать в EDDS</string>
     <string name="convert_to_png">Конвертировать в PNG</string>
     <string name="copy">Копировать</string>
+    <string name="copy_file_name">Скопировать имя файла</string>
     <string name="copy_properties">Копировать свойства</string>
     <string name="italic">Курсив</string>
     <string name="latin">Латиница</string>

@@ -1,6 +1,7 @@
 package com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import com.github.demandss.dayz_workbench_tool.layout_editor.EditorWidgetNode
 
 /*
@@ -12,7 +13,7 @@ import com.github.demandss.dayz_workbench_tool.layout_editor.EditorWidgetNode
  *   the texture, which is an assumption, since the probes had no texture.
  * - `inside` is the largest box of that ratio that fits the parent, `outside` the smallest that covers it,
  *   `fixwidth` keeps the height the size gave and takes the width from the ratio (the name says the opposite).
- * - The box is pinned to the top left corner of where the widget would be, and it may stick out of its parent.
+ * - The resulting box keeps the widget's alignment in the parent, and it may stick out of its parent.
  */
 
 /** The rectangle of [node] after `fixaspect`, given the [rect] its size and position gave and its [parent]. */
@@ -46,7 +47,7 @@ internal fun fixAspect(
             Mode.OUTSIDE -> if (parentIsWider) pw to pw / ratio else ph * ratio to ph
             Mode.FIX_WIDTH -> rect.height * ratio to rect.height
         }
-    return Rect(rect.left, rect.top, rect.left + w, rect.top + h)
+    return computeRect(node, parent, Size(w, h))
 }
 
 private enum class Mode { INSIDE, OUTSIDE, FIX_WIDTH }

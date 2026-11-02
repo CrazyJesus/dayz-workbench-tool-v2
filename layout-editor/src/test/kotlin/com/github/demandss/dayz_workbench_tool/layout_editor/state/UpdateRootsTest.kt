@@ -7,6 +7,7 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class UpdateRootsTest {
     private fun folder(name: String): File = createTempDirectory(name).toFile()
@@ -32,5 +33,21 @@ class UpdateRootsTest {
 
         first.deleteRecursively()
         second.deleteRecursively()
+    }
+
+    @Test
+    fun vanillaSourceOnTheWorkDriveIsShownInsteadOfAnArchive() {
+        val source = File(work, "gui")
+        val styles = File(source, "looknfeel/dayzwidgets.styles")
+        styles.parentFile.mkdirs()
+        styles.writeText("<WidgetStyles />")
+
+        val state = LayoutEditorState(work, CoroutineScope(SupervisorJob() + Dispatchers.Default), "", emptyList())
+        val root = state.treeRoots!!.single()
+        assertEquals("DayZ", root.label)
+        assertEquals(source.path, root.path)
+        assertNull(root.archive)
+
+        source.deleteRecursively()
     }
 }

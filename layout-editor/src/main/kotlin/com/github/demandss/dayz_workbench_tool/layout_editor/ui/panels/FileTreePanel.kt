@@ -1,5 +1,6 @@
 package com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,10 +22,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +56,8 @@ import com.github.demandss.dayz_workbench_tool.ui.icons.fileIcon
 import com.github.demandss.dayz_workbench_tool.ui.theme.*
 import kotlinx.coroutines.*
 import org.jetbrains.compose.resources.stringResource
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.nio.file.*
 import java.nio.file.StandardWatchEventKinds.*
 import kotlin.math.roundToInt
@@ -464,6 +471,22 @@ fun FileTreePanel(
                                         }
                                         ContextMenuSeparator()
                                     }
+                                    if (!entry.isDir) {
+                                        ContextMenuItem(str(Res.string.copy_file_name), icon = AppIcon.UI_COPY) {
+                                            showMenu = false
+                                            runCatching {
+                                                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(entry.name), null)
+                                            }.onSuccess {
+                                                state.notify(str(Res.string.copied_x, entry.name), ToastKind.SUCCESS)
+                                            }.onFailure {
+                                                state.notify(
+                                                    str(Res.string.could_not_copy_x, it.message ?: it.javaClass.simpleName),
+                                                    ToastKind.ERROR,
+                                                )
+                                            }
+                                        }
+                                        ContextMenuSeparator()
+                                    }
                                     if (isInPbo(entry.path)) return@ContextMenu
                                     // Next to a file, inside a folder
                                     val createDir = if (entry.isDir) entry.path else entry.path.parent
@@ -798,6 +821,8 @@ internal fun ContextMenuItem(
     text: String,
     color: Color = TextForeground,
     icon: AppIcon? = null,
+    image: ImageBitmap? = null,
+    imageTint: Color? = null,
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -813,7 +838,17 @@ internal fun ContextMenuItem(
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (icon != null) AppIconView(icon, size = 14.dp, tint = color.takeIf { it != TextForeground })
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    contentScale = ContentScale.Fit,
+                    colorFilter = imageTint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
+                )
+            } else if (icon != null) {
+                AppIconView(icon, size = 14.dp, tint = color.takeIf { it != TextForeground })
+            }
             Text(text, color = color, fontSize = 11.sp, maxLines = 1)
         }
     }

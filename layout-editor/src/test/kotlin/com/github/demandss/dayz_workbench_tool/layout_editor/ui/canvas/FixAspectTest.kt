@@ -111,4 +111,30 @@ class FixAspectTest {
 
         assertEquals(Rect(0f, 0f, 500f, 500f), layout.rects[kid.id])
     }
+
+    @Test
+    fun `fixaspect keeps the center anchor after expanding a child`() {
+        val screen = Rect(0f, 0f, 1920f, 1080f)
+        val kid = child("inside", size = "0.16 0.09")
+        kid.node.properties["halign"] = "center_ref"
+        kid.node.properties["valign"] = "center_ref"
+        val root = EditorWidgetNode(node = WidgetNode(WidgetType.FRAME, WidgetType.FRAME.className, "root"), children = mutableListOf(kid))
+
+        val rect = layoutTree(root, screen, textureAspect = { 16f / 9f }).rects.getValue(kid.id)
+
+        assertEquals(0f, rect.left, 0.01f)
+        assertEquals(0f, rect.top, 0.01f)
+        assertEquals(screen.width, rect.width, 0.01f)
+        assertEquals(screen.height, rect.height, 0.01f)
+    }
+
+    @Test
+    fun `fixaspect keeps right and bottom anchors when the final size changes`() {
+        val parent = Rect(0f, 0f, 160f, 60f)
+        val kid = child("inside")
+        kid.node.properties["halign"] = "right_ref"
+        kid.node.properties["valign"] = "bottom_ref"
+
+        assertEquals(Rect(100f, 0f, 160f, 60f), fixAspect(kid, computeRect(kid, parent), parent))
+    }
 }
