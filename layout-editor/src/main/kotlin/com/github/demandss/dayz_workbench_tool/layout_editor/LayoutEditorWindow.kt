@@ -48,6 +48,7 @@ import com.github.demandss.dayz_workbench_tool.layout_editor.state.DragSource
 import com.github.demandss.dayz_workbench_tool.layout_editor.state.LayoutDocument
 import com.github.demandss.dayz_workbench_tool.layout_editor.state.LayoutEditorState
 import com.github.demandss.dayz_workbench_tool.layout_editor.state.PaletteMode
+import com.github.demandss.dayz_workbench_tool.layout_editor.state.TabCloseAction
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.FontViewer
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.LayoutCanvas
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.canvas.TextureViewer
@@ -58,6 +59,9 @@ import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.BulkEditD
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.CanvasContextMenu
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.CommandPalette
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ConfirmDialog
+import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ContextMenu
+import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ContextMenuItem
+import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ContextMenuSeparator
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.EmptyState
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.FileTreePanel
 import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.FlatDialog
@@ -596,6 +600,7 @@ private fun FileTabBar(state: LayoutEditorState) {
                         index == state.activeFileIndex,
                 onClick = { state.selectLayout(index) },
                 onClose = { state.closeFile(index) },
+                onContextAction = { action -> state.closeTabs(0, index, action) },
             )
         }
         state.openTextures.forEachIndexed { index, doc ->
@@ -605,6 +610,7 @@ private fun FileTabBar(state: LayoutEditorState) {
                 isActive = index == state.activeTextureIndex && state.activeImageSetIndex < 0 && state.activeStylesIndex < 0,
                 onClick = { state.selectTexture(index) },
                 onClose = { state.closeTexture(index) },
+                onContextAction = { action -> state.closeTabs(1, index, action) },
             )
         }
         state.openImageSets.forEachIndexed { index, doc ->
@@ -616,6 +622,7 @@ private fun FileTabBar(state: LayoutEditorState) {
                 isActive = index == state.activeImageSetIndex && state.activeStylesIndex < 0,
                 onClick = { state.selectImageSet(index) },
                 onClose = { state.closeImageSet(index) },
+                onContextAction = { action -> state.closeTabs(2, index, action) },
             )
         }
         state.openStyles.forEachIndexed { index, doc ->
@@ -627,6 +634,7 @@ private fun FileTabBar(state: LayoutEditorState) {
                 isActive = index == state.activeStylesIndex,
                 onClick = { state.selectStyles(index) },
                 onClose = { state.closeStyles(index) },
+                onContextAction = { action -> state.closeTabs(3, index, action) },
             )
         }
     }
@@ -641,47 +649,77 @@ private fun FileTab(
     isActive: Boolean,
     onClick: () -> Unit,
     onClose: () -> Unit,
+    onContextAction: (TabCloseAction) -> Unit,
     hint: String? = null,
 ) {
     val bg = if (isActive) FrameBackground else ElementsBackground
     val requester = remember { BringIntoViewRequester() }
+    var menuPosition by remember { mutableStateOf<IntOffset?>(null) }
     LaunchedEffect(isActive) { if (isActive) requester.bringIntoView() }
-    Tip(hint) {
-        Row(
-            modifier =
-                Modifier
-                    .bringIntoViewRequester(requester)
-                    .background(bg)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onClick,
-                    ).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppIconView(icon)
-            Spacer(Modifier.width(6.dp))
-            Text(label, color = TextForeground, fontSize = 12.sp, maxLines = 1)
-            if (modified) {
-                Spacer(Modifier.width(6.dp))
-                Box(Modifier.size(6.dp).background(Color(0xFF4A9EFF), CircleShape))
-            }
-            Spacer(Modifier.width(6.dp))
-            Tip(stringResource(Res.string.close_the_tab_ctrl_w)) {
-                Box(
+    Box {
+        Tip(hint) {
+            Row(
+                modifier =
                     Modifier
-                        .size(14.dp)
-                        .clickable(
+                        .bringIntoViewRequester(requester)
+                        .background(bg)
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                                        val position = event.changes.first().position
+                                        menuPosition = IntOffset(position.x.roundToInt(), position.y.roundToInt())
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                        }.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onClose,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AppIconView(AppIcon.UI_CLOSE, size = 12.dp, tint = GhostlyText)
+                            onClick = onClick,
+                        ).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppIconView(icon)
+                Spacer(Modifier.width(6.dp))
+                Text(label, color = TextForeground, fontSize = 12.sp, maxLines = 1)
+                if (modified) {
+                    Spacer(Modifier.width(6.dp))
+                    Box(Modifier.size(6.dp).background(Color(0xFF4A9EFF), CircleShape))
                 }
+                Spacer(Modifier.width(6.dp))
+                Tip(stringResource(Res.string.close_the_tab_ctrl_w)) {
+                    Box(
+                        Modifier
+                            .size(14.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onClose,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AppIconView(AppIcon.UI_CLOSE, size = 12.dp, tint = GhostlyText)
+                    }
+                }
+                Spacer(Modifier.width(2.dp))
             }
-            Spacer(Modifier.width(2.dp))
+        }
+        menuPosition?.let { position ->
+            ContextMenu(position, onDismiss = { menuPosition = null }) {
+                fun run(action: TabCloseAction) {
+                    menuPosition = null
+                    onContextAction(action)
+                }
+                ContextMenuItem(str(Res.string.close), icon = AppIcon.UI_CLOSE) { run(TabCloseAction.CURRENT) }
+                ContextMenuSeparator()
+                ContextMenuItem(str(Res.string.close_other_tabs)) { run(TabCloseAction.OTHERS) }
+                ContextMenuItem(str(Res.string.close_tabs_to_right)) { run(TabCloseAction.RIGHT) }
+                ContextMenuItem(str(Res.string.close_tabs_to_left)) { run(TabCloseAction.LEFT) }
+                ContextMenuSeparator()
+                ContextMenuItem(str(Res.string.close_all_tabs)) { run(TabCloseAction.ALL) }
+            }
         }
     }
     Box(Modifier.width(1.dp).fillMaxHeight().background(DarkenedBorder))

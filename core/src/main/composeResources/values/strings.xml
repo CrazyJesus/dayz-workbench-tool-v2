@@ -195,6 +195,11 @@
     <string name="loading">Loading…</string>
     <string name="no_tasks_added">No tasks added</string>
     <string name="close">Close</string>
+    <string name="close_all_tabs">Close all tabs</string>
+    <string name="close_other_tabs">Close other tabs</string>
+    <string name="close_tabs_to_left">Close tabs to the left</string>
+    <string name="close_tabs_to_right">Close tabs to the right</string>
+    <string name="close_tabs_x">Close %1$s tabs?</string>
     <string name="close_x">Close %1$s?</string>
     <string name="close_the_tab_ctrl_w">Close the tab (Ctrl+W)</string>
     <string name="replace_x_x">Replace %1$s (%2$s)</string>
