@@ -100,6 +100,34 @@ class LayoutFormatsTest {
     }
 
     @Test
+    fun `multiline comments after Name do not override widget names`() {
+        val source =
+            """
+            FrameWidgetClass {
+             Name "Main" /* root comment
+              Name "Wrong root"
+             */
+             {
+              PanelWidgetClass "{000000001234ABCD}" {
+               Name "Child" /* child comment
+                Name "Wrong child"
+               */
+              }
+             }
+            }
+            """.trimIndent()
+
+        val root = LayoutParser.parse(source)
+        val saved = LayoutSerializer.serialize(root)
+
+        assertEquals("Main", root.name)
+        assertEquals("Child", root.children.single().name)
+        assertFalse(saved.contains("Wrong root"))
+        assertFalse(saved.contains("Wrong child"))
+        assertEquals("Main", LayoutParser.parse(saved).name)
+    }
+
+    @Test
     fun `legacy children get distinct resource ids`() {
         val root = LayoutParser.parse("FrameWidgetClass Root {\n {\n PanelWidgetClass A {}\n PanelWidgetClass B {}\n }\n}")
 

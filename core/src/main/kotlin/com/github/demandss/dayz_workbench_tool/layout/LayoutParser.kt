@@ -104,9 +104,7 @@ private class ParserState(
         skipInlineWhitespace()
         val value =
             if (key == "Name" && pos < input.length && input[pos] == '"') {
-                val quotedName = readQuotedString()
-                readToEndOfLine()
-                quotedName
+                readQuotedString()
             } else {
                 readToEndOfLine()
             }
