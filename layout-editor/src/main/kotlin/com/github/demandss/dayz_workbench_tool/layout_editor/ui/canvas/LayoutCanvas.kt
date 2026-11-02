@@ -117,8 +117,8 @@ private fun hitTest(
     return if (inside && node.id !in locked) node else null
 }
 
-/** Every widget under [worldPos], the topmost first, for the menu of the right button. */
-private fun hitsAt(
+/** Every widget under [worldPos], the topmost first, for the context menu and double-click layer selection. */
+internal fun hitsAt(
     node: EditorWidgetNode,
     point: Offset,
     layout: TreeLayout,
@@ -767,6 +767,13 @@ fun LayoutCanvas(
                         var boxStartWorld = Offset.Zero
                         var currentBox: Rect? = null
 
+                        val layerClicks = LayerClickCycle(viewConfiguration.doubleTapTimeoutMillis)
+                        var primaryClickEligible = false
+                        var primaryClickStart = Offset.Zero
+                        var primaryClickMoved = false
+                        var primaryClickWasPair = false
+                        var primaryClickStartedOnLayer: UUID? = null
+
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Main)
                             val pos = event.changes.firstOrNull()?.position ?: continue
@@ -777,6 +784,7 @@ fun LayoutCanvas(
                             if (state.livePreview && event.type != PointerEventType.Scroll && !isPanning &&
                                 !event.buttons.isTertiaryPressed && !spacePressed
                             ) {
+                                if (event.type == PointerEventType.Press) layerClicks.reset()
                                 // A click gives the canvas the keyboard, so that typing goes into the field that was clicked
                                 if (event.type == PointerEventType.Press) runCatching { focusRequester.requestFocus() }
                                 previewPointer(state, event.type, event.buttons.isPrimaryPressed, screenToWorld(pos, zoom, pan))
@@ -819,6 +827,48 @@ fun LayoutCanvas(
                                 PointerEventType.Press -> {
                                     val isMiddle = event.buttons.isTertiaryPressed
                                     val isPrimary = event.buttons.isPrimaryPressed
+                                    val plainPrimary =
+                                        isPrimary && !isMiddle && !event.buttons.isSecondaryPressed && !spacePressed &&
+                                            !event.keyboardModifiers.isShiftPressed && !event.keyboardModifiers.isCtrlPressed &&
+                                            !event.keyboardModifiers.isAltPressed
+                                    primaryClickEligible = plainPrimary
+                                    primaryClickStart = pos
+                                    primaryClickMoved = false
+                                    primaryClickWasPair = false
+                                    primaryClickStartedOnLayer = null
+                                    if (!plainPrimary) layerClicks.reset()
+
+                                    val pressDoc = state.activeFile?.takeIf { plainPrimary }
+                                    val pressLayout = pressDoc?.let { layoutOf(state, it.root, screenRect(state)) }
+                                    val pressHits = mutableListOf<EditorWidgetNode>()
+                                    if (pressDoc != null && pressLayout != null) {
+                                        hitsAt(
+                                            pressDoc.root,
+                                            screenToWorld(pos, zoom, pan),
+                                            pressLayout,
+                                            state.hiddenIds.toSet(),
+                                            pressHits,
+                                        )
+                                    }
+                                    primaryClickStartedOnLayer =
+                                        state.selectedIds.singleOrNull()?.takeIf { selected -> pressHits.any { it.id == selected } }
+                                    val clickPair =
+                                        if (plainPrimary) {
+                                            layerClicks.secondPress(event.changes.first().uptimeMillis, pos, pressDoc?.path)
+                                        } else {
+                                            null
+                                        }
+                                    primaryClickWasPair = clickPair != null
+                                    val cycleTarget =
+                                        if (clickPair != null && pressDoc != null && pressLayout != null) {
+                                            layerClicks.nextTarget(
+                                                preferredLayerHits(pressHits, pressLayout) { state.pictureFor(it, pressDoc.path) != null },
+                                                clickPair.selectedAtStart,
+                                                pressDoc.path,
+                                            )
+                                        } else {
+                                            null
+                                        }
                                     when {
                                         event.buttons.isSecondaryPressed -> {
                                             runCatching { focusRequester.requestFocus() }
@@ -836,6 +886,12 @@ fun LayoutCanvas(
                                             isPanning = true
                                             panStartScreen = pos
                                             panStartOffset = pan
+                                            event.changes.forEach { it.consume() }
+                                        }
+
+                                        cycleTarget != null && pressDoc != null -> {
+                                            runCatching { focusRequester.requestFocus() }
+                                            state.selectBy(cycleTarget.id, emptyList(), SelectMode.REPLACE)
                                             event.changes.forEach { it.consume() }
                                         }
 
@@ -859,9 +915,11 @@ fun LayoutCanvas(
                                             val worldPos = screenToWorld(pos, zoom, pan)
                                             val doc = state.activeFile
                                             val refRect = screenRect(state)
-                                            val layout = doc?.let { layoutOf(state, it.root, refRect) }
+                                            val layout = pressLayout ?: doc?.let { layoutOf(state, it.root, refRect) }
                                             val hit =
-                                                if (doc != null &&
+                                                if (plainPrimary) {
+                                                    pressHits.firstOrNull { it.id !in state.lockedIds }
+                                                } else if (doc != null &&
                                                     layout != null
                                                 ) {
                                                     hitTest(doc.root, worldPos, layout, state.hiddenIds.toSet(), state.lockedIds.toSet())
@@ -962,6 +1020,10 @@ fun LayoutCanvas(
                                 }
 
                                 PointerEventType.Move -> {
+                                    if (primaryClickEligible && (pos - primaryClickStart).getDistance() >= DRAG_THRESHOLD) {
+                                        primaryClickMoved = true
+                                        layerClicks.reset()
+                                    }
                                     when {
                                         isPanning -> {
                                             state.panOffset = panStartOffset + (pos - panStartScreen)
@@ -1142,6 +1204,25 @@ fun LayoutCanvas(
                                         selectionBox = null
                                         currentBox = null
                                     }
+                                    if (primaryClickEligible) {
+                                        when {
+                                            primaryClickWasPair -> {}
+
+                                            !primaryClickMoved && !undoPushed && !resizePushed && !isPanning -> {
+                                                layerClicks.rememberClick(
+                                                    event.changes.first().uptimeMillis,
+                                                    pos,
+                                                    state.activeFile?.path,
+                                                    primaryClickStartedOnLayer,
+                                                )
+                                            }
+
+                                            else -> {
+                                                layerClicks.reset()
+                                            }
+                                        }
+                                    }
+                                    primaryClickEligible = false
                                     isPanning = false
                                     resizeHandle = null
                                     state.resizeLabel = null
