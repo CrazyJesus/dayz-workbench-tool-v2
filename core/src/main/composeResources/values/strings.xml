@@ -912,4 +912,13 @@
     <string name="param_about_bouncer_speed">The speed, cycles per second</string>
     <string name="param_about_rotator_speed">The speed of rotation, cycles per second</string>
     <string name="param_about_scrollbarcontainer_invert">1: scroll the other way</string>
+    <string name="default_palette">Default palette</string>
+    <string name="layout_palette">Layout colours</string>
+    <string name="custom_palette">Custom palette</string>
+    <string name="new_colour">New</string>
+    <string name="old_colour">Old</string>
+    <string name="linear_colour">Linear colour</string>
+    <string name="integer_range">Integer</string>
+    <string name="float_range">Float</string>
+    <string name="pick_colour_from_screen">Pick colour from screen</string>
 </resources>

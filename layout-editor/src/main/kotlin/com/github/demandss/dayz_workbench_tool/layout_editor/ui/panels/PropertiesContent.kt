@@ -360,6 +360,7 @@ fun PropertiesContent(
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
             PropertiesHeader(state, node.id, node.node.name, node.node.type, props, commit)
             WidgetSection(
+                state,
                 props,
                 commit,
                 remember(doc?.root) {
@@ -529,6 +530,7 @@ private fun AlignmentGrid(
 
 @Composable
 private fun WidgetSection(
+    state: LayoutEditorState,
     props: Map<String, String>,
     commit: (String, String) -> Unit,
     documentColors: List<Color>,
@@ -548,7 +550,7 @@ private fun WidgetSection(
     CheckRow("ignoregloballv", props["ignoregloballv"], commit)
     CheckRow("keepsafezone", props["keepsafezone"], commit)
 
-    ColorRows(props, commit, documentColors)
+    ColorRows(state, props, commit, documentColors)
 
     CheckRow("scaled", props["scaled"], commit)
     PropRow(
@@ -884,8 +886,92 @@ private fun RawSection(
 // Color rows
 // ---------------------------------------------------------------------------
 
+internal class ColorEditSession(
+    private val state: LayoutEditorState,
+) {
+    private val index = state.activeFileIndex
+    private val original = state.openFiles[index].root
+    private val wasModified = state.openFiles[index].isModified
+    private val ids = state.selectedIds.toSet()
+    private val originalColors =
+        ids.associateWith {
+            original
+                .findNode(it)
+                ?.node
+                ?.properties
+                ?.get("color")
+        }
+    private val knownSnapshots =
+        java.util.Collections.newSetFromMap(java.util.IdentityHashMap<EditorWidgetNode, Boolean>()).apply {
+            add(original)
+            addAll(state.openFiles[index].undoStack)
+            addAll(state.openFiles[index].redoStack)
+        }
+    private var previewed = false
+    private var lastPreviewColor: Color? = null
+
+    private fun withoutPreview(root: EditorWidgetNode): EditorWidgetNode =
+        ids.fold(root) { tree, id ->
+            tree.updateNode(id) { node ->
+                val properties = LinkedHashMap(node.node.properties)
+                val originalColor = originalColors[id]
+                if (originalColor == null) {
+                    properties.remove("color")
+                } else {
+                    properties["color"] = originalColor
+                }
+                node.copy(node = node.node.copy(properties = properties))
+            }
+        }
+
+    private fun rebaseNewHistory() {
+        val document = state.openFiles.getOrNull(index) ?: return
+        for (stack in listOf(document.undoStack, document.redoStack)) {
+            val rebased = stack.map { if (it in knownSnapshots) it else withoutPreview(it) }
+            stack.clear()
+            stack.addAll(rebased)
+        }
+    }
+
+    fun preview(color: Color) {
+        val document = state.openFiles.getOrNull(index) ?: return
+        previewed = true
+        lastPreviewColor = color
+        val value = color.toFileColor()
+        val root =
+            ids.fold(document.root) { tree, id ->
+                tree.updateNode(id) { node ->
+                    node.copy(node = node.node.copy(properties = LinkedHashMap(node.node.properties).also { it["color"] = value }))
+                }
+            }
+        state.openFiles[index] = document.copy(root = root, isModified = true)
+    }
+
+    fun cancel() {
+        if (!previewed) return
+        val document = state.openFiles.getOrNull(index) ?: return
+        rebaseNewHistory()
+        val restored = withoutPreview(document.root)
+        state.openFiles[index] = document.copy(root = restored, isModified = wasModified || restored != original)
+    }
+
+    fun confirm(color: Color) {
+        if (!previewed) return
+        if (color != lastPreviewColor) preview(color)
+        val document = state.openFiles.getOrNull(index) ?: return
+        rebaseNewHistory()
+        val beforeColor = withoutPreview(document.root)
+        if (document.root != beforeColor) {
+            state.pushUndo(index, beforeColor, str(Res.string.change))
+        } else {
+            state.openFiles[index] = document.copy(isModified = wasModified || document.root != original)
+        }
+    }
+}
+
 @Composable
 private fun ColorRows(
+    state: LayoutEditorState,
     props: Map<String, String>,
     commit: (String, String) -> Unit,
     documentColors: List<Color>,
@@ -907,8 +993,7 @@ private fun ColorRows(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         PropLabel("color", "color" in props, stringResource(Res.string.the_colours_in_the_file_are_linear), Modifier.width(LABEL_W))
-        var picking by remember { mutableStateOf(false) }
-        val anchorHeight = with(LocalDensity.current) { 22.dp.roundToPx() }
+        var session by remember { mutableStateOf<ColorEditSession?>(null) }
         Box {
             Tip(stringResource(Res.string.pick_a_colour)) {
                 Box(
@@ -917,16 +1002,22 @@ private fun ColorRows(
                         .background(Color(0xFF2B2B30))
                         .background(shown)
                         .border(1.dp, Color(0xFF3A3C40))
-                        .clickable(remember { MutableInteractionSource() }, null) { picking = true },
+                        .clickable(remember { MutableInteractionSource() }, null) { session = ColorEditSession(state) },
                 )
             }
-            if (picking) {
-                ColorPickerPopup(
+            session?.let { edit ->
+                ColorPickerWindow(
                     initial = shown,
-                    anchorHeightPx = anchorHeight,
-                    onDismiss = { picking = false },
                     documentColors = documentColors,
-                    onCommit = { commit("color", it.toFileColor()) },
+                    onPreview = edit::preview,
+                    onConfirm = {
+                        edit.confirm(it)
+                        session = null
+                    },
+                    onCancel = {
+                        edit.cancel()
+                        session = null
+                    },
                 )
             }
         }
@@ -1532,6 +1623,7 @@ private fun ColumnScope.MultiProperties(
         }
         MultiTransform(state)
         WidgetSection(
+            state,
             props,
             commit,
             remember(state.activeFile?.root) {
