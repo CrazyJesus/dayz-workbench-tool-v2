@@ -912,4 +912,13 @@
     <string name="param_about_bouncer_speed">Скорость, циклов в секунду</string>
     <string name="param_about_rotator_speed">Скорость вращения, циклов в секунду</string>
     <string name="param_about_scrollbarcontainer_invert">1: прокрутка в обратную сторону</string>
+    <string name="default_palette">Стандартная палитра</string>
+    <string name="layout_palette">Цвета лайаута</string>
+    <string name="custom_palette">Своя палитра</string>
+    <string name="new_colour">Новый</string>
+    <string name="old_colour">Исходный</string>
+    <string name="linear_colour">Линейный цвет</string>
+    <string name="integer_range">Целые</string>
+    <string name="float_range">Дробные</string>
+    <string name="pick_colour_from_screen">Взять цвет с экрана</string>
 </resources>

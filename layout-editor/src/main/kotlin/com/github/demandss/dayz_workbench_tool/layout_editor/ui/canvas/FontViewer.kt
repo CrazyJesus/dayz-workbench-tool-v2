@@ -34,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -46,7 +45,7 @@ import com.github.demandss.dayz_workbench_tool.layout.WidgetType
 import com.github.demandss.dayz_workbench_tool.layout_editor.EditorWidgetNode
 import com.github.demandss.dayz_workbench_tool.layout_editor.state.LayoutEditorState
 import com.github.demandss.dayz_workbench_tool.layout_editor.state.TextureDocument
-import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ColorPickerPopup
+import com.github.demandss.dayz_workbench_tool.layout_editor.ui.panels.ColorPickerWindow
 import com.github.demandss.dayz_workbench_tool.resources.*
 import com.github.demandss.dayz_workbench_tool.ui.theme.DarkenedBorder
 import com.github.demandss.dayz_workbench_tool.ui.theme.ElementsBackground
@@ -391,7 +390,8 @@ private fun ColorBox(
     onChange: (String) -> Unit,
 ) {
     var picking by remember { mutableStateOf(false) }
-    val anchorHeight = with(LocalDensity.current) { 22.dp.roundToPx() }
+    val originalHex = remember(picking) { hex }
+    var previewed by remember(picking) { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box {
             Box(
@@ -403,12 +403,20 @@ private fun ColorBox(
                     .clickable(remember { MutableInteractionSource() }, null, enabled = enabled) { picking = true },
             )
             if (picking) {
-                // The same picker as for the colour of a widget: a square, the hue, the opacity, the hex value and the presets
-                ColorPickerPopup(
-                    initial = hexColor(hex, Color.Black),
-                    anchorHeightPx = anchorHeight,
-                    onDismiss = { picking = false },
-                    onCommit = { onChange(colorToHex(it)) },
+                ColorPickerWindow(
+                    initial = hexColor(originalHex, Color.Black),
+                    onPreview = {
+                        previewed = true
+                        onChange(colorToHex(it))
+                    },
+                    onConfirm = {
+                        if (previewed) onChange(colorToHex(it))
+                        picking = false
+                    },
+                    onCancel = {
+                        if (previewed) onChange(originalHex)
+                        picking = false
+                    },
                 )
             }
         }
