@@ -8,15 +8,26 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,11 +69,13 @@ fun HierarchyPanel(
     val doc = state.activeFile
     val expandedIds = remember { mutableStateListOf<UUID>() }
     var query by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<UUID?>(null) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(doc?.path) {
         expandedIds.clear()
         query = ""
+        editingId = null
         doc?.root?.id?.let { expandedIds.add(it) }
     }
 
@@ -154,6 +167,7 @@ fun HierarchyPanel(
                         isDragSource = isDragSource,
                         isHidden = state.hiddenIds.contains(node.id),
                         isLocked = state.lockedIds.contains(node.id),
+                        isRenaming = editingId == node.id,
                         onToggleHidden = { state.toggleHidden(node.id) },
                         onToggleLocked = { state.toggleLocked(node.id) },
                         onToggleExpand = {
@@ -167,6 +181,12 @@ fun HierarchyPanel(
                             state.canvasFocusTick++
                             state.selectBy(node.id, flatList.map { (n, _) -> n.id }, mode)
                         },
+                        onRenameRequest = { editingId = node.id },
+                        onRenameCommit = { name ->
+                            editingId = null
+                            state.renameWidget(node.id, name)
+                        },
+                        onRenameCancel = { editingId = null },
                         onDragStart = {
                             state.dragSession = DragSession(DragSource.FromHierarchy(node.id))
                         },
@@ -187,10 +207,14 @@ private fun HierarchyRow(
     isDragSource: Boolean,
     isHidden: Boolean,
     isLocked: Boolean,
+    isRenaming: Boolean,
     onToggleHidden: () -> Unit,
     onToggleLocked: () -> Unit,
     onToggleExpand: () -> Unit,
     onSelect: (SelectMode) -> Unit,
+    onRenameRequest: () -> Unit,
+    onRenameCommit: (String) -> Unit,
+    onRenameCancel: () -> Unit,
     onDragStart: () -> Unit,
 ) {
     val bg =
@@ -205,6 +229,8 @@ private fun HierarchyRow(
         } else {
             Modifier
         }
+    val rowCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val nameBounds = remember { mutableStateOf<Rect?>(null) }
 
     Row(
         modifier =
@@ -216,10 +242,13 @@ private fun HierarchyRow(
                 .padding(start = (depth * 14).dp)
                 .then(
                     if (isDragSource) Modifier.background(Color(0x40FFFFFF)) else Modifier,
-                ).pointerInput(node.id) {
+                ).onGloballyPositioned { rowCoordinates.value = it }
+                .pointerInput(node.id, isRenaming) {
                     var pressPos = Offset.Zero
                     var pressed = false
                     var lastClickTime = 0L
+                    var lastClickPos = Offset.Zero
+                    var lastClickOnName = false
                     var dragStarted = false
 
                     awaitPointerEventScope {
@@ -229,7 +258,7 @@ private fun HierarchyRow(
 
                             when (event.type) {
                                 PointerEventType.Press -> {
-                                    if (event.buttons.isPrimaryPressed && event.changes.none { it.isConsumed }) {
+                                    if (!isRenaming && event.buttons.isPrimaryPressed && event.changes.none { it.isConsumed }) {
                                         pressPos = pos
                                         pressed = true
                                         dragStarted = false
@@ -242,6 +271,7 @@ private fun HierarchyRow(
                                         val dist = (pos - pressPos).getDistance()
                                         if (dist > 8f) {
                                             dragStarted = true
+                                            lastClickTime = 0L
                                             onDragStart()
                                         }
                                         event.changes.forEach { it.consume() }
@@ -252,19 +282,33 @@ private fun HierarchyRow(
                                     if (pressed) {
                                         pressed = false
                                         if (!dragStarted) {
-                                            val now = System.currentTimeMillis()
-                                            val isDouble = now - lastClickTime < 400
-                                            lastClickTime = now
-                                            if (isDouble && node.children.isNotEmpty()) {
-                                                onToggleExpand()
-                                            } else if (!isDouble) {
-                                                onSelect(
-                                                    selectMode(
-                                                        event.keyboardModifiers.isShiftPressed,
-                                                        event.keyboardModifiers.isCtrlPressed,
-                                                    ),
-                                                )
+                                            val now = event.changes.first().uptimeMillis
+                                            val isDouble =
+                                                lastClickTime != 0L && now - lastClickTime in 0..viewConfiguration.doubleTapTimeoutMillis &&
+                                                    (pos - lastClickPos).getDistance() <= 8f
+                                            val nameClick =
+                                                rowCoordinates.value?.localToWindow(pos)?.let { nameBounds.value?.contains(it) } == true
+                                            when {
+                                                isDouble && nameClick && lastClickOnName -> {
+                                                    onRenameRequest()
+                                                }
+
+                                                isDouble && node.children.isNotEmpty() -> {
+                                                    onToggleExpand()
+                                                }
+
+                                                else -> {
+                                                    onSelect(
+                                                        selectMode(
+                                                            event.keyboardModifiers.isShiftPressed,
+                                                            event.keyboardModifiers.isCtrlPressed,
+                                                        ),
+                                                    )
+                                                }
                                             }
+                                            lastClickTime = if (isDouble) 0L else now
+                                            lastClickPos = pos
+                                            lastClickOnName = nameClick
                                         }
                                         dragStarted = false
                                         event.changes.forEach { it.consume() }
@@ -296,14 +340,20 @@ private fun HierarchyRow(
 
         AppIconView(widgetIcon(node.node.type), modifier = Modifier.padding(horizontal = 3.dp))
 
-        Text(
-            node.node.name.ifEmpty { if (depth == 0) "(root)" else "—" },
-            color = if (isSelected) TextForeground else Color(0xCCCCCCCC),
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 2.dp).weight(1f),
-        )
+        Box(Modifier.padding(start = 2.dp).weight(1f)) {
+            if (isRenaming) {
+                HierarchyNameField(node.node.name, Modifier.fillMaxWidth(), onRenameCommit, onRenameCancel)
+            } else {
+                Text(
+                    node.node.name.ifEmpty { if (depth == 0) "(root)" else "—" },
+                    color = if (isSelected) TextForeground else Color(0xCCCCCCCC),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.onGloballyPositioned { nameBounds.value = it.boundsInWindow() },
+                )
+            }
+        }
         if (node.hasBareCenter()) AppIconView(AppIcon.UI_WARN, size = 13.dp, modifier = Modifier.padding(end = 2.dp))
         RowToggle(
             if (isHidden) AppIcon.UI_EYEOFF else AppIcon.UI_EYE,
@@ -318,6 +368,66 @@ private fun HierarchyRow(
             onToggleLocked,
         )
     }
+}
+
+@Composable
+private fun HierarchyNameField(
+    name: String,
+    modifier: Modifier,
+    onCommit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var field by remember(name) { mutableStateOf(TextFieldValue(name, selection = TextRange(0, name.length))) }
+    var focused by remember { mutableStateOf(false) }
+    var finished by remember { mutableStateOf(false) }
+    val requester = remember { FocusRequester() }
+
+    fun commit() {
+        if (finished) return
+        finished = true
+        onCommit(field.text)
+    }
+
+    fun cancel() {
+        if (finished) return
+        finished = true
+        onCancel()
+    }
+
+    LaunchedEffect(Unit) { requester.requestFocus() }
+    BasicTextField(
+        value = field,
+        onValueChange = { field = it },
+        singleLine = true,
+        textStyle = TextStyle(color = TextForeground, fontSize = 11.sp),
+        cursorBrush = SolidColor(TextForeground),
+        modifier =
+            modifier
+                .background(FrameBackground)
+                .border(1.dp, SelectColor)
+                .focusRequester(requester)
+                .onFocusChanged { focus ->
+                    if (focused && !focus.isFocused) commit()
+                    focused = focus.isFocused
+                }.onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Enter, Key.NumPadEnter -> {
+                            commit()
+                            true
+                        }
+
+                        Key.Escape -> {
+                            cancel()
+                            true
+                        }
+
+                        else -> {
+                            false
+                        }
+                    }
+                },
+    )
 }
 
 /** A small icon at the end of a hierarchy row. Shown dimmed until it is switched on. */
