@@ -47,6 +47,9 @@ compose.desktop {
     application {
         mainClass = "com.github.demandss.dayz_workbench_tool.MainKt"
 
+        // ProGuard optimization corrupts stack map frames in LayoutCanvas's draw lambda.
+        buildTypes.release.proguard { optimize.set(false) }
+
         // Crash dumps go to logs/ (ignored by git) instead of the working directory
         jvmArgs +=
             listOf(
