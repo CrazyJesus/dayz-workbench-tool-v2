@@ -310,6 +310,14 @@ enum class AppIcon(
             IconShape("M4 2l8 4.6-3.6 1 2 4-1.5.8-2-4L4.8 11z"),
         ),
     ),
+    UI_EYEDROPPER(
+        null,
+        listOf(
+            IconShape("M9.8 2.1l4.1 4.1-1.2 1.2-4.1-4.1z", IconFill.TINT),
+            IconShape("M9.2 3.1l3.7 3.7-6.6 6.6c-.5.5-1.1.7-1.8.7H2v-2.5c0-.7.2-1.3.7-1.8z"),
+            IconShape("M7.7 4.6l3.7 3.7"),
+        ),
+    ),
     UI_HAND(
         null,
         listOf(

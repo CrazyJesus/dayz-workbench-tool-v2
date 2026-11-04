@@ -98,6 +98,13 @@ jobs:
         shell: pwsh
         run: ./gradlew :app:packagePortable :app:packageReleaseMsi "--no-daemon" "-x" "ktlintCheckAll"
 
+      - name: Verify release canvas bytecode
+        shell: pwsh
+        run: |
+          $appDir = Join-Path $PWD 'app/build/compose/binaries/main-release/app/Dayz Workbench Tool/app'
+          & "$env:JAVA_HOME/bin/java.exe" -Xverify:all --class-path "$appDir/*" app/verification/VerifyReleaseClasses.java
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Find installer
         id: find-installer
         shell: pwsh
